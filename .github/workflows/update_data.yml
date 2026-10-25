@@ -3,7 +3,6 @@ name: PC28 自动数据更新
 on:
   workflow_dispatch:
   schedule:
-    # 每小时运行一次，避开整点高峰
     - cron: "17 * * * *"
 
 permissions:
@@ -21,31 +20,108 @@ jobs:
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 安装 Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: requirements.txt
 
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: 记录更新前的数据状态
+        run: |
+          python - <<'PY'
+          import csv
+          import os
+
+          path = "data/historical.csv"
+          if not os.path.exists(path):
+              raise SystemExit(f"错误：找不到 {path}")
+
+          with open(path, encoding="utf-8-sig", newline="") as f:
+              rows = list(csv.DictReader(f))
+
+          print(f"更新前 CSV 记录数：{len(rows)}")
+          if rows:
+              print(f"CSV 字段：{list(rows[0].keys())}")
+              values = []
+              for row in rows:
+                  value = row.get("draw_nbr", "")
+                  try:
+                      values.append(int(value))
+                  except (ValueError, TypeError):
+                      pass
+              if values:
+                  print(f"更新前最小期号：{min(values)}")
+                  print(f"更新前最大期号：{max(values)}")
+              else:
+                  print("警告：draw_nbr 字段没有可识别的整数期号")
+          PY
+
       - name: 更新开奖历史
         run: |
-          python src/fetch_data.py
+          python -u src/fetch_data.py
+
+      - name: 验证更新后的数据
+        run: |
+          python - <<'PY'
+          import csv
+          import os
+
+          path = "data/historical.csv"
+          if not os.path.exists(path):
+              raise SystemExit("错误：更新脚本执行后 CSV 文件不存在")
+
+          with open(path, encoding="utf-8-sig", newline="") as f:
+              reader = csv.DictReader(f)
+              if not reader.fieldnames or "draw_nbr" not in reader.fieldnames:
+                  raise SystemExit("错误：CSV 缺少 draw_nbr 期号字段")
+              rows = list(reader)
+
+          periods = []
+          for row in rows:
+              try:
+                  periods.append(int(row["draw_nbr"]))
+              except (ValueError, TypeError):
+                  continue
+
+          print(f"更新后 CSV 记录数：{len(rows)}")
+          print(f"有效期号数量：{len(periods)}")
+
+          if not periods:
+              raise SystemExit("错误：CSV 中没有有效期号")
+
+          print(f"更新后最小期号：{min(periods)}")
+          print(f"更新后最大期号：{max(periods)}")
+          print(f"CSV 最后一行期号：{rows[-1].get('draw_nbr', '')}")
+
+          if len(periods) != len(set(periods)):
+              print("警告：检测到重复期号，请检查数据合并逻辑")
+          PY
 
       - name: 保存更新后的数据
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/historical.csv reports/data_update.json
+
+          git add data/historical.csv
+
+          if [ -f reports/data_update.json ]; then
+            git add reports/data_update.json
+          else
+            echo "提示：reports/data_update.json 不存在"
+          fi
+
           if git diff --cached --quiet; then
-            echo "数据没有变化，无需提交"
+            echo "结果：本次没有文件变化，未创建提交"
+            echo "请结合前面的接口日志和期号判断原因"
           else
             git commit -m "自动更新 PC28 开奖历史"
-            git push
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "结果：数据文件已提交并推送"
           fi
