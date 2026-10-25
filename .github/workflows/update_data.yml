@@ -1,127 +1,122 @@
 name: PC28 自动数据更新
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "5 * * * *"
+workflow_dispatch:
+schedule:
+- cron: “*/5 * * * *”
 
 permissions:
-  contents: write
+contents: write
 
 concurrency:
-  group: pc28-data-update
-  cancel-in-progress: false
+group: pc28-data-update
+cancel-in-progress: false
 
 jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+update-data:
+runs-on: ubuntu-latest
+timeout-minutes: 10
 
-    steps:
-      - name: 检出仓库
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: 安装 Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: 安装依赖
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: 记录更新前的数据状态
-        run: |
-          python - <<'PY'
-          import csv
-          import os
-
-          path = "data/historical.csv"
-          if not os.path.exists(path):
-              raise SystemExit(f"错误：找不到 {path}")
-
-          with open(path, encoding="utf-8-sig", newline="") as f:
-              rows = list(csv.DictReader(f))
-
-          print(f"更新前 CSV 记录数：{len(rows)}")
-          if rows:
-              print(f"CSV 字段：{list(rows[0].keys())}")
-              values = []
-              for row in rows:
-                  value = row.get("draw_nbr", "")
-                  try:
-                      values.append(int(value))
-                  except (ValueError, TypeError):
-                      pass
-              if values:
-                  print(f"更新前最小期号：{min(values)}")
-                  print(f"更新前最大期号：{max(values)}")
-              else:
-                  print("警告：draw_nbr 字段没有可识别的整数期号")
-          PY
-
-      - name: 更新开奖历史
-        run: |
-          python -u src/fetch_data.py
-
-      - name: 验证更新后的数据
-        run: |
-          python - <<'PY'
-          import csv
-          import os
-
-          path = "data/historical.csv"
-          if not os.path.exists(path):
-              raise SystemExit("错误：更新脚本执行后 CSV 文件不存在")
-
-          with open(path, encoding="utf-8-sig", newline="") as f:
-              reader = csv.DictReader(f)
-              if not reader.fieldnames or "draw_nbr" not in reader.fieldnames:
-                  raise SystemExit("错误：CSV 缺少 draw_nbr 期号字段")
-              rows = list(reader)
-
-          periods = []
-          for row in rows:
-              try:
-                  periods.append(int(row["draw_nbr"]))
-              except (ValueError, TypeError):
-                  continue
-
-          print(f"更新后 CSV 记录数：{len(rows)}")
-          print(f"有效期号数量：{len(periods)}")
-
-          if not periods:
-              raise SystemExit("错误：CSV 中没有有效期号")
-
-          print(f"更新后最小期号：{min(periods)}")
-          print(f"更新后最大期号：{max(periods)}")
-          print(f"CSV 最后一行期号：{rows[-1].get('draw_nbr', '')}")
-
-          if len(periods) != len(set(periods)):
-              print("警告：检测到重复期号，请检查数据合并逻辑")
-          PY
-
-      - name: 保存更新后的数据
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add data/historical.csv
-
-          if [ -f reports/data_update.json ]; then
-            git add reports/data_update.json
-          else
-            echo "提示：reports/data_update.json 不存在"
-          fi
-
-          if git diff --cached --quiet; then
-            echo "结果：本次没有文件变化，未创建提交"
-            echo "请结合前面的接口日志和期号判断原因"
-          else
-            git commit -m "自动更新 PC28 开奖历史"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-            echo "结果：数据文件已提交并推送"
-          fi
+steps:
+  - name: 检出仓库
+    uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+  - name: 安装 Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.11"
+      cache: pip
+      cache-dependency-path: requirements.txt
+  - name: 安装依赖
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+  - name: 检查更新前的历史数据
+    run: |
+      python - <<'PY'
+      import csv
+      import os
+      path = "data/historical.csv"
+      if not os.path.exists(path):
+          raise SystemExit(f"错误：找不到 {path}")
+      with open(path, encoding="utf-8-sig", newline="") as f:
+          rows = list(csv.DictReader(f))
+      periods = []
+      for row in rows:
+          try:
+              periods.append(int(row.get("draw_nbr", "")))
+          except (ValueError, TypeError):
+              pass
+      print(f"更新前 CSV 记录数：{len(rows)}")
+      if not periods:
+          raise SystemExit("错误：历史 CSV 没有有效期号")
+      print(f"更新前最小期号：{min(periods)}")
+      print(f"更新前最大期号：{max(periods)}")
+      PY
+  - name: 更新开奖历史
+    run: |
+      python -u src/fetch_data.py
+  - name: 验证更新后的历史数据
+    run: |
+      python - <<'PY'
+      import csv
+      import os
+      path = "data/historical.csv"
+      if not os.path.exists(path):
+          raise SystemExit("错误：更新后 CSV 不存在")
+      with open(path, encoding="utf-8-sig", newline="") as f:
+          reader = csv.DictReader(f)
+          if not reader.fieldnames or "draw_nbr" not in reader.fieldnames:
+              raise SystemExit("错误：CSV 缺少 draw_nbr 字段")
+          rows = list(reader)
+      periods = []
+      invalid = 0
+      for row in rows:
+          try:
+              periods.append(int(row["draw_nbr"]))
+          except (ValueError, TypeError):
+              invalid += 1
+      if not periods:
+          raise SystemExit("错误：没有有效期号")
+      unique_periods = set(periods)
+      duplicates = len(periods) - len(unique_periods)
+      ordered = sorted(unique_periods)
+      gaps = []
+      for previous, current in zip(ordered, ordered[1:]):
+          if current > previous + 1:
+              gaps.append((previous + 1, current - 1))
+      print(f"更新后 CSV 记录数：{len(rows)}")
+      print(f"有效期号数量：{len(periods)}")
+      print(f"最小期号：{min(periods)}")
+      print(f"最大期号：{max(periods)}")
+      print(f"最后一行期号：{rows[-1].get('draw_nbr', '')}")
+      print(f"重复期号数量：{duplicates}")
+      print(f"无效记录数量：{invalid}")
+      print(f"缺期区间数量：{len(gaps)}")
+      for start, end in gaps[:30]:
+          print(f"缺期区间：{start}-{end}")
+      if duplicates:
+          raise SystemExit("错误：检测到重复期号")
+      if invalid:
+          raise SystemExit("错误：存在无法解析的期号")
+      if gaps:
+          print("警告：历史数据存在期号缺口，请核对开奖源和补数情况")
+      else:
+          print("期号连续性检查通过")
+      PY
+  - name: 保存更新后的数据
+    run: |
+      git config user.name "github-actions[bot]"
+      git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      git add data/historical.csv
+      if [ -f reports/data_update.json ]; then
+        git add reports/data_update.json
+      fi
+      if git diff --cached --quiet; then
+        echo "本次没有文件变化，无需提交"
+      else
+        git commit -m "自动更新 PC28 开奖历史"
+        git push origin "HEAD:${GITHUB_REF_NAME}"
+        echo "数据文件已提交并推送"
+      fi
