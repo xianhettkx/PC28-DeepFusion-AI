@@ -1,13 +1,18 @@
 {
   "project": "PC28-DeepFusion-AI",
   "status": "success",
-  "updated_at": "2026-10-25T16:43:17.498503+00:00",
+  "updated_at": "2026-10-25T17:11:26.111566+00:00",
   "api_url": "https://pc28.help/api/kj.json?nbr=100",
-  "history_before": 30013,
+  "history_before": 30018,
   "api_records_validated": 100,
-  "new_records": 5,
-  "history_after": 30018,
+  "api_min_period": 3498400,
+  "api_max_period": 3498499,
+  "history_max_before": 3498491,
+  "new_records": 8,
+  "history_after": 30026,
+  "history_max_after": 3498499,
+  "missing_periods_between_old_and_api": [],
+  "rejected_count": 0,
   "rejected_records": [],
-  "latest_period": 3498491,
-  "earliest_period": 3468474
+  "api_ahead_of_history": true
 }
