@@ -1,0 +1,461 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#f4f7fb">
+<title>PC28 · 智能分析控制台</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#172033;--sub:#778198;--line:#e8edf5;--blue:#3268f5;--green:#159b72;--red:#e34e5d;--shadow:0 5px 22px #2638580b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC",sans-serif;font-size:14px;padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+button{font:inherit;cursor:pointer;border:0}
+.top{padding:calc(17px + env(safe-area-inset-top)) 17px 18px;background:linear-gradient(130deg,#183c96,#3268f5);color:white}
+.topline{display:flex;align-items:center;justify-content:space-between}
+.brand{font-size:19px;font-weight:850;letter-spacing:-.5px}
+.tag{font-size:10px;border:1px solid #ffffff55;padding:5px 8px;border-radius:20px}
+.subtitle{margin-top:7px;color:#dbe5ff;font-size:12px}
+.wrap{max-width:620px;margin:auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:11px;box-shadow:var(--shadow)}
+.heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}
+.heading b{font-size:14px}
+.muted{font-size:11px;color:var(--sub)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.btn{padding:12px 8px;border-radius:11px;font-weight:750;font-size:13px}
+.primary{background:var(--blue);color:white}
+.secondary{background:#edf2ff;color:#2857d4}
+.darkbtn{background:#202b43;color:white}
+.btn:disabled{opacity:.55}
+.status{font-size:11px;color:var(--sub);line-height:1.7;margin-top:10px;overflow-wrap:anywhere}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#9aa4b5;margin-right:5px}
+.dot.ok{background:#18a879}.dot.bad{background:#e34e5d}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.metric{background:#f7f9fd;border-radius:11px;padding:11px 8px;min-width:0}
+.metric label{display:block;color:var(--sub);font-size:10px;margin-bottom:6px}
+.metric strong{font-size:17px;display:block;overflow-wrap:anywhere}
+.metric small{font-size:10px;color:var(--sub)}
+.draw{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.period{font-size:12px;color:var(--sub)}
+.balls{display:flex;gap:6px;margin-top:10px}
+.ball{width:37px;height:37px;border-radius:50%;display:grid;place-items:center;background:#edf2ff;color:#2857d4;font-size:17px;font-weight:850}
+.total{font-size:27px;font-weight:900}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{background:#f0f3f8;color:#566179;border-radius:7px;padding:5px 8px;font-size:11px}
+.prediction{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pick{padding:14px 10px;border-radius:13px;background:#f4f7ff;border:1px solid #dce6ff}
+.pick .rank{font-size:10px;color:#7082a8}
+.pick .name{font-size:20px;font-weight:900;color:#2859d9;margin:7px 0}
+.pick .prob{font-size:13px;font-weight:800}
+.bar{height:5px;background:#e3eaf8;border-radius:9px;overflow:hidden;margin-top:9px}
+.bar span{display:block;height:100%;background:linear-gradient(90deg,#6489ff,#3268f5);border-radius:9px}
+.note{font-size:11px;color:var(--sub);line-height:1.7;margin-top:10px}
+.tablewrap{overflow:auto;max-height:330px}
+table{border-collapse:collapse;width:100%;font-size:11px;white-space:nowrap}
+th,td{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line)}
+th{color:var(--sub);font-weight:600;position:sticky;top:0;background:var(--card)}
+.good{color:var(--green)}.badtext{color:var(--red)}
+.probrow{display:grid;grid-template-columns:44px 1fr 48px;gap:8px;align-items:center;margin:12px 0;font-size:12px}
+.probtrack{height:7px;background:#edf1f7;border-radius:8px;overflow:hidden}
+.probtrack span{height:100%;display:block;background:#6b8cf5;border-radius:8px}
+.footer{text-align:center;color:#9aa3b3;font-size:10px;padding:12px}
+.hidden{display:none!important}
+input{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--text);margin:7px 0}
+@media(min-width:520px){.wrap{padding:18px}.card{padding:18px}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="topline">
+    <div class="brand">PC28 <span style="font-weight:400">/ ANALYTICS</span></div>
+    <span class="tag">GITHUB DATA LINK</span>
+  </div>
+  <div class="subtitle">历史数据 · 模型报告 · 双组合统计估计</div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <div class="heading"><b>数据操作</b><span class="muted" id="clock">等待操作</span></div>
+    <div class="actions">
+      <button class="btn primary" id="apiBtn" onclick="fetchAPI()">获取最新 API</button>
+      <button class="btn secondary" id="historyBtn" onclick="loadAll()">同步 GitHub 数据</button>
+      <button class="btn darkbtn" onclick="runPrediction()">分析下一期</button>
+      <button class="btn secondary" onclick="exportJSON()">导出分析 JSON</button>
+    </div>
+    <div class="status" id="status"><span class="dot"></span>尚未加载数据</div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>数据概览</b><span class="muted">仓库公开文件</span></div>
+    <div class="metrics">
+      <div class="metric"><label>历史记录</label><strong id="rows">—</strong><small>CSV 行数</small></div>
+      <div class="metric"><label>最新期号</label><strong id="latestPeriod" style="font-size:14px">—</strong><small>历史最大期号</small></div>
+      <div class="metric"><label>缺期区间</label><strong id="gaps">—</strong><small>按期号检查</small></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>最新开奖</b><span class="muted" id="apiState">等待获取</span></div>
+    <div class="draw">
+      <div>
+        <div class="period">期号 <strong id="drawPeriod">—</strong></div>
+        <div class="balls"><span class="ball" id="a">—</span><span class="ball" id="b">—</span><span class="ball" id="c">—</span></div>
+      </div>
+      <div style="text-align:right">
+        <div class="muted">开奖号码总和</div>
+        <div class="total" id="sum">—</div>
+        <div class="chips"><span class="chip" id="sizeChip">大小 —</span><span class="chip" id="oddChip">单双 —</span></div>
+      </div>
+    </div>
+    <div class="note" id="drawTime">点击「获取最新 API」尝试读取实时接口。</div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>下一期 · 双组合估计</b><span class="muted" id="predictionSource">等待分析</span></div>
+    <div class="prediction" id="picks">
+      <div class="pick"><div class="rank">组合 01</div><div class="name">—</div><div class="prob">等待分析</div></div>
+      <div class="pick"><div class="rank">组合 02</div><div class="name">—</div><div class="prob">等待分析</div></div>
+    </div>
+    <div id="allProbs" style="margin-top:15px"></div>
+    <div class="note" id="predictionNote">请先同步历史数据和模型报告，再点击分析。</div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>现有模型报告</b><span class="muted" id="modelState">未加载</span></div>
+    <div class="metrics">
+      <div class="metric"><label>报告样本量</label><strong id="modelRows">—</strong></div>
+      <div class="metric"><label>测试准确率</label><strong id="modelAcc">—</strong></div>
+      <div class="metric"><label>验证状态</label><strong id="modelValid" style="font-size:13px">—</strong></div>
+    </div>
+    <div class="note" id="modelInfo">报告只用于展示可识别字段，不会伪称模型已经成功运行。</div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>最近历史记录</b><span class="muted" id="historyInfo">最多展示 30 条</span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>期号</th><th>开奖号码</th><th>和值</th><th>组合</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="4">尚未加载</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="heading"><b>数据源设置</b><span class="muted">高级选项</span></div>
+    <label class="muted">GitHub 仓库基础地址</label>
+    <input id="repoURL" value="https://raw.githubusercontent.com/xianhettkx/PC28-DeepFusion-AI/main" spellcheck="false">
+    <label class="muted">开奖 API 地址</label>
+    <input id="apiURL" value="https://pc28.help/api/kj.json?nbr=100" spellcheck="false">
+    <button class="btn secondary" style="width:100%;margin-top:5px" onclick="saveSettings()">应用地址并重新加载</button>
+    <div class="note">只修改本页面的地址设置，不会修改 GitHub 仓库文件。历史 CSV 由后台工作流维护。</div>
+  </section>
+
+  <div class="footer">PC28 ANALYTICS · 统计结果不代表确定性预测</div>
+</main>
+
+<script>
+"use strict";
+
+const GROUPS = ["大单","小单","大双","小双"];
+const DEFAULT_REPO = "https://raw.githubusercontent.com/xianhettkx/PC28-DeepFusion-AI/main";
+const DEFAULT_API = "https://pc28.help/api/kj.json?nbr=100";
+
+let historyRows = [];
+let apiRows = [];
+let modelReport = null;
+let latestPrediction = null;
+let apiOK = false;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString("en-US");
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+
+function setStatus(message, kind="") {
+  $("status").innerHTML = '<span class="dot '+(kind==="ok"?"ok":kind==="bad"?"bad":"")+'"></span>'+esc(message);
+  $("clock").textContent = new Date().toLocaleTimeString("zh-CN",{hour12:false});
+}
+function repoBase(){return $("repoURL").value.trim().replace(/\/+$/,"");}
+function apiURL(){return $("apiURL").value.trim();}
+async function getText(url){
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP "+r.status+" · "+url);
+  return await r.text();
+}
+async function getJSON(url){return JSON.parse(await getText(url));}
+
+function csvParse(text){
+  const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());
+  if(lines.length<2) throw new Error("CSV 没有数据行");
+  function splitLine(line){
+    const out=[];let s="",quoted=false;
+    for(let i=0;i<line.length;i++){
+      const c=line[i];
+      if(c==='"' && quoted && line[i+1]==='"'){s+='"';i++;}
+      else if(c==='"') quoted=!quoted;
+      else if(c===","&&!quoted){out.push(s);s="";}
+      else s+=c;
+    }
+    out.push(s);return out;
+  }
+  const headers=splitLine(lines[0]).map(x=>x.trim());
+  return lines.slice(1).map(line=>{
+    const cols=splitLine(line),obj={};
+    headers.forEach((h,i)=>obj[h]=(cols[i]??"").trim());
+    return obj;
+  }).filter(r=>Object.values(r).some(Boolean));
+}
+function getPeriod(r){
+  const v=r.draw_nbr ?? r.nbr ?? r.period ?? r.issue ?? r.qihao ?? r.期号;
+  const n=Number(String(v??"").replace(/[^\d]/g,""));
+  return Number.isFinite(n)&&n>0?n:null;
+}
+function getNumberString(r){
+  let v=r.number ?? r.numbers ?? r.result ?? r.code ?? r.open_code ?? "";
+  if(Array.isArray(v)) v=v.join("+");
+  v=String(v);
+  if(!v.includes("+") && /^\d{3}$/.test(v)) v=v.split("").join("+");
+  if(!v.includes("+") && /^\d+\s+\d+\s+\d+$/.test(v)) v=v.trim().split(/\s+/).join("+");
+  return v;
+}
+function classify(total){
+  if(total<14) return total%2===0?"小双":"小单";
+  return total%2===0?"大双":"大单";
+}
+function parseDraw(r){
+  const raw=getNumberString(r);
+  const nums=raw.match(/\d+/g);
+  if(!nums || nums.length<3) return null;
+  const abc=nums.slice(0,3).map(Number);
+  if(abc.some(n=>!Number.isFinite(n))) return null;
+  const total=abc.reduce((x,y)=>x+y,0);
+  return {
+    period:getPeriod(r),
+    date:r.date??r.time??r.draw_time??"",
+    number:abc.join("+"),
+    abc,total,
+    group:r.combination??r.group??classify(total)
+  };
+}
+function normalizeRows(rows){
+  const map=new Map();
+  for(const r of rows){
+    const d=parseDraw(r);
+    if(!d) continue;
+    const key=d.period===null?d.number+"|"+d.date:String(d.period);
+    if(!map.has(key)) map.set(key,d);
+  }
+  return [...map.values()].sort((a,b)=>(a.period??0)-(b.period??0));
+}
+async function loadAll(){
+  $("historyBtn").disabled=true;
+  setStatus("正在读取 GitHub 历史 CSV 和模型报告…");
+  try{
+    const base=repoBase();
+    const results=await Promise.allSettled([
+      getText(base+"/data/historical.csv"),
+      getJSON(base+"/reports/latest.json")
+    ]);
+    if(results[0].status==="fulfilled"){
+      historyRows=normalizeRows(csvParse(results[0].value));
+      renderHistory();
+    } else {
+      throw new Error("历史 CSV 读取失败："+results[0].reason.message);
+    }
+    if(results[1].status==="fulfilled"){
+      modelReport=results[1].value;renderModel();
+    } else {
+      modelReport=null;renderModel();
+      $("modelInfo").textContent="模型报告暂时读取失败："+results[1].reason.message;
+    }
+    updateMetrics();
+    setStatus("GitHub 数据读取完成。历史 "+historyRows.length+" 条。","ok");
+    runPrediction();
+  }catch(e){
+    setStatus("加载失败："+e.message,"bad");
+  }finally{$("historyBtn").disabled=false;}
+}
+
+function renderHistory(){
+  const rows=[...historyRows].sort((a,b)=>(b.period??0)-(a.period??0)).slice(0,30);
+  $("historyBody").innerHTML=rows.map(d=>
+    `<tr><td>${esc(d.period??"—")}</td><td>${esc(d.number)}</td><td><b>${d.total}</b></td><td>${esc(d.group)}</td></tr>`
+  ).join("")||'<tr><td colspan="4">没有有效记录</td></tr>';
+  $("historyInfo").textContent="展示 "+rows.length+" 条";
+}
+function updateMetrics(){
+  const periods=historyRows.map(x=>x.period).filter(Number.isFinite);
+  const unique=[...new Set(periods)].sort((a,b)=>a-b);
+  let gaps=0;
+  for(let i=1;i<unique.length;i++) if(unique[i]-unique[i-1]>1) gaps+=unique[i]-unique[i-1]-1;
+  $("rows").textContent=fmt(historyRows.length);
+  $("latestPeriod").textContent=unique.length?String(unique[unique.length-1]):"—";
+  $("gaps").textContent=fmt(gaps);
+}
+function renderDraw(d,source){
+  if(!d)return;
+  $("drawPeriod").textContent=d.period??"—";
+  $("a").textContent=d.abc[0];$("b").textContent=d.abc[1];$("c").textContent=d.abc[2];
+  $("sum").textContent=d.total;
+  $("sizeChip").textContent=d.total<14?"小":"大";
+  $("oddChip").textContent=d.total%2?"单":"双";
+  $("drawTime").textContent=(d.date?"时间："+d.date+" · ":"")+"来源："+source;
+}
+async function fetchAPI(){
+  $("apiBtn").disabled=true;
+  $("apiState").textContent="请求中…";
+  setStatus("正在直接请求开奖 API…");
+  try{
+    const json=await getJSON(apiURL());
+    let raw=Array.isArray(json)?json:(json.data??json.result??json.list??[]);
+    if(!Array.isArray(raw)) throw new Error("API JSON 中未找到 data 数组");
+    apiRows=normalizeRows(raw);
+    if(!apiRows.length) throw new Error("API 返回数据中没有可识别的号码");
+    const d=apiRows.reduce((a,b)=>(b.period??0)>(a.period??0)?b:a,apiRows[0]);
+    renderDraw(d,"实时 API");
+    apiOK=true;$("apiState").textContent="API 成功";
+    const p=d.period;
+    const hp=historyRows.map(x=>x.period).filter(Number.isFinite);
+    const max=hp.length?Math.max(...hp):0;
+    const newCount=apiRows.filter(x=>x.period!==null&&x.period>max).length;
+    setStatus("实时 API 获取成功："+apiRows.length+" 条；比本地最大期号新增候选 "+newCount+" 期。","ok");
+  }catch(e){
+    apiOK=false;$("apiState").textContent="请求失败";
+    setStatus("实时 API 请求失败："+e.message+"。可能是浏览器跨域限制；可先使用 GitHub 历史数据分析。","bad");
+  }finally{$("apiBtn").disabled=false;}
+}
+
+function walkObjects(root,depth=0,out=[]){
+  if(!root||typeof root!=="object"||depth>6)return out;
+  out.push(root);
+  if(Array.isArray(root)){for(const v of root.slice(0,100))walkObjects(v,depth+1,out);}
+  else for(const v of Object.values(root)) if(v&&typeof v==="object")walkObjects(v,depth+1,out);
+  return out;
+}
+function findModelProbabilities(report){
+  if(!report)return null;
+  const objects=walkObjects(report);
+  for(const obj of objects){
+    const keys=Object.keys(obj);
+    const result={};
+    for(const g of GROUPS){
+      if(typeof obj[g]==="number")result[g]=obj[g];
+      else if(obj[g]&&typeof obj[g]==="object"){
+        const v=obj[g].probability??obj[g].prob??obj[g].score;
+        if(typeof v==="number")result[g]=v;
+      }
+    }
+    if(GROUPS.every(g=>Number.isFinite(result[g])&&result[g]>=0)){
+      const sum=GROUPS.reduce((s,g)=>s+result[g],0);
+      if(sum>0)return Object.fromEntries(GROUPS.map(g=>[g,result[g]/sum]));
+    }
+  }
+  return null;
+}
+function localEstimate(rows){
+  const sorted=rows.filter(x=>GROUPS.includes(x.group)).sort((a,b)=>(a.period??0)-(b.period??0));
+  if(!sorted.length)throw new Error("历史数据没有可识别的四类组合");
+  const all=Object.fromEntries(GROUPS.map(g=>[g,0]));
+  const recent=Object.fromEntries(GROUPS.map(g=>[g,0]));
+  sorted.forEach(x=>all[x.group]++);
+  const tail=sorted.slice(-30);
+  tail.forEach((x,i)=>recent[x.group]+=(i+1)/tail.length);
+  const n=sorted.length, rn=tail.length;
+  const scores={};
+  for(const g of GROUPS){
+    const freq=all[g]/n;
+    const rf=recent[g]/(rn?rn:1);
+    scores[g]=0.55*freq+0.45*rf;
+  }
+  const sum=GROUPS.reduce((s,g)=>s+scores[g],0);
+  return Object.fromEntries(GROUPS.map(g=>[g,scores[g]/sum]));
+}
+function getAccuracy(report){
+  if(!report)return null;
+  const objs=walkObjects(report);
+  for(const o of objs){
+    for(const [k,v] of Object.entries(o)){
+      if(/accuracy|acc/i.test(k)&&typeof v==="number"&&v>=0&&v<=1){
+        return v;
+      }
+    }
+  }
+  return null;
+}
+function runPrediction(){
+  if(!historyRows.length){
+    setStatus("请先点击「同步 GitHub 数据」。","bad");return;
+  }
+  try{
+    let probs=findModelProbabilities(modelReport);
+    let source="历史统计估计";
+    if(probs)source="模型报告概率";
+    else probs=localEstimate(historyRows);
+    const ranked=GROUPS.map(g=>({group:g,p:probs[g]??0})).sort((a,b)=>b.p-a.p);
+    const picks=ranked.slice(0,2);
+    latestPrediction={
+      created_at:new Date().toISOString(),
+      next_period:Math.max(...historyRows.map(x=>x.period??0))+1,
+      picks:picks.map(x=>x.group),
+      probabilities:probs,
+      source,
+      history_rows:historyRows.length,
+      latest_period:Math.max(...historyRows.map(x=>x.period??0))
+    };
+    $("predictionSource").textContent=source;
+    $("picks").innerHTML=picks.map((x,i)=>
+      `<div class="pick"><div class="rank">组合 0${i+1} · ${i===0?"排名第一":"排名第二"}</div><div class="name">${esc(x.group)}</div><div class="prob">${(x.p*100).toFixed(2)}% 统计估计</div><div class="bar"><span style="width:${Math.max(0,Math.min(100,x.p*100))}%"></span></div></div>`
+    ).join("");
+    $("allProbs").innerHTML=ranked.map(x=>
+      `<div class="probrow"><b>${esc(x.group)}</b><div class="probtrack"><span style="width:${Math.max(0,Math.min(100,x.p*100))}%"></span></div><span>${(x.p*100).toFixed(2)}%</span></div>`
+    ).join("");
+    $("predictionNote").textContent=`估计目标期号：${latestPrediction.next_period}。来源：${source}。两个组合按当前估计概率排序，不代表保证命中。`;
+    setStatus("分析完成：输出两个不同组合。","ok");
+  }catch(e){setStatus("分析失败："+e.message,"bad");}
+}
+function renderModel(){
+  const r=modelReport;
+  if(!r){
+    $("modelState").textContent="不可用";
+    $("modelRows").textContent="—";$("modelAcc").textContent="—";$("modelValid").textContent="—";
+    return;
+  }
+  $("modelState").textContent="已读取";
+  const objs=walkObjects(r);
+  let rows=null,last=null,valid=null;
+  for(const o of objs){
+    if(rows===null){
+      rows=o.rows??o.history_rows??o.total_rows??o.history_after??null;
+    }
+    if(last===null)last=o.last_period??o.history_max_after??o.last_nbr??null;
+    if(valid===null)valid=o.validation_passed??o.validation_ok??o.status??null;
+  }
+  const acc=getAccuracy(r);
+  $("modelRows").textContent=rows===null?"—":fmt(Number(rows));
+  $("modelAcc").textContent=acc===null?"—":(acc*100).toFixed(2)+"%";
+  $("modelValid").textContent=valid===true?"通过":valid===false?"失败":String(valid??"已读取");
+  $("modelInfo").textContent="报告来自 reports/latest.json。识别到的最新期号："+(last??"未识别")+"。如果报告未包含下一期四类概率，预测会自动退回历史统计方法。";
+}
+function exportJSON(){
+  if(!latestPrediction){runPrediction();if(!latestPrediction)return;}
+  const blob=new Blob([JSON.stringify({
+    prediction:latestPrediction,
+    latest_api:apiRows.slice(-10),
+    model_report:modelReport
+  },null,2)],{type:"application/json;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="pc28-analysis.json";a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function saveSettings(){
+  try{
+    new URL(repoBase());new URL(apiURL());
+  }catch(e){setStatus("地址格式无效，请检查 URL。","bad");return;}
+  await loadAll();
+}
+loadAll();
+</script>
+</body>
+</html>
