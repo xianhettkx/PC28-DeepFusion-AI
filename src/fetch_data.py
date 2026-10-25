@@ -7,15 +7,16 @@ PC28-DeepFusion-AI 数据采集模块
 2. 兼容常见字段格式
 3. 校验开奖号码、总和与分类
 4. 合并历史CSV并按期号去重
-5. 生成数据更新报告
+5. 输出接口最新期号、CSV最新期号及更新差距
+6. 生成数据更新报告
 
 注意：
 此模块不会自动下注，也不预测开奖结果。
+接口返回数据可能存在延迟，程序不会伪造缺失的开奖记录。
 """
 
 import os
 import json
-import time
 import logging
 from datetime import datetime, timezone
 
@@ -107,7 +108,6 @@ def normalize_record(item):
     )
 
     numbers = parse_numbers(raw_number)
-
     total = sum(numbers)
 
     supplied_total = item.get(
@@ -146,13 +146,13 @@ def normalize_record(item):
 
 
 def fetch_latest():
-    """请求开奖接口并转换数据。"""
+    """请求接口并返回校验通过的开奖记录。"""
 
-    logging.info("正在请求开奖接口")
+    logging.info("正在请求开奖接口：%s", API_URL)
 
     response = requests.get(
         API_URL,
-        timeout=20,
+        timeout=30,
         headers={
             "User-Agent": "PC28-DeepFusion-AI/1.0"
         },
@@ -206,24 +206,47 @@ def fetch_latest():
 
     if rejected:
         logging.warning(
-            "有 %s 条记录未通过校验，未写入历史库",
-            len(rejected)
+            "有 %s 条接口记录未通过校验",
+            len(rejected),
         )
+        for item in rejected[:10]:
+            logging.warning(
+                "无效记录 index=%s，原因=%s",
+                item["index"],
+                item["error"],
+            )
 
     df = pd.DataFrame(normalized, columns=COLUMNS)
 
     if df["draw_nbr"].duplicated().any():
-        raise ValueError(
-            "接口返回了重复期号，请检查数据源后再更新"
+        duplicated = (
+            df.loc[
+                df["draw_nbr"].duplicated(keep=False),
+                "draw_nbr",
+            ]
+            .astype(int)
+            .tolist()
         )
+        raise ValueError(
+            f"接口返回重复期号：{duplicated[:10]}"
+        )
+
+    api_min = int(df["draw_nbr"].min())
+    api_max = int(df["draw_nbr"].max())
+
+    logging.info("接口原始记录数：%s", len(records))
+    logging.info("接口有效记录数：%s", len(df))
+    logging.info("接口最小期号：%s", api_min)
+    logging.info("接口最大期号：%s", api_max)
 
     return df, rejected
 
 
 def load_history():
-    """读取已有历史库，不存在时创建空表。"""
+    """读取已有历史库。"""
 
     if not os.path.exists(HISTORY_FILE):
+        logging.warning("历史CSV不存在，将创建新文件")
         return pd.DataFrame(columns=COLUMNS)
 
     history = pd.read_csv(
@@ -232,7 +255,10 @@ def load_history():
         dtype={"draw_nbr": str},
     )
 
-    missing = [c for c in COLUMNS if c not in history.columns]
+    missing = [
+        col for col in COLUMNS
+        if col not in history.columns
+    ]
 
     if missing:
         raise ValueError(
@@ -242,7 +268,8 @@ def load_history():
     history = history[COLUMNS].copy()
 
     history["draw_nbr"] = pd.to_numeric(
-        history["draw_nbr"], errors="raise"
+        history["draw_nbr"],
+        errors="raise",
     ).astype("int64")
 
     if history["draw_nbr"].duplicated().any():
@@ -250,18 +277,36 @@ def load_history():
             "现有历史库存在重复期号；为防止误覆盖，已停止更新"
         )
 
+    logging.info("历史CSV记录数：%s", len(history))
+
+    if not history.empty:
+        logging.info(
+            "CSV更新前最小期号：%s",
+            int(history["draw_nbr"].min()),
+        )
+        logging.info(
+            "CSV更新前最大期号：%s",
+            int(history["draw_nbr"].max()),
+        )
+
     return history
 
 
 def merge_history(history, latest):
-    """保留历史记录，并按期号合并新记录。"""
+    """合并历史与接口记录，不静默覆盖已有开奖号码。"""
 
-    old_ids = set(history["draw_nbr"].astype(int).tolist())
-
+    history = history.copy()
     latest = latest.copy()
+
+    if not history.empty:
+        history["draw_nbr"] = history["draw_nbr"].astype("int64")
+
     latest["draw_nbr"] = latest["draw_nbr"].astype("int64")
 
-    # 对相同期号，如果内容不同，不允许静默覆盖。
+    old_ids = set(
+        history["draw_nbr"].astype(int).tolist()
+    )
+
     old_lookup = {
         int(row["draw_nbr"]): row
         for _, row in history.iterrows()
@@ -270,19 +315,21 @@ def merge_history(history, latest):
     for _, row in latest.iterrows():
         period = int(row["draw_nbr"])
 
-        if period in old_lookup:
-            old = old_lookup[period]
+        if period not in old_lookup:
+            continue
 
-            for col in [
-                "draw_number",
-                "draw_num",
-                "combination_type",
-            ]:
-                if str(old[col]) != str(row[col]):
-                    raise ValueError(
-                        f"期号 {period} 的历史记录与接口不一致，"
-                        "已停止写入，防止静默覆盖"
-                    )
+        old = old_lookup[period]
+
+        for col in [
+            "draw_number",
+            "draw_num",
+            "combination_type",
+        ]:
+            if str(old[col]) != str(row[col]):
+                raise ValueError(
+                    f"期号 {period} 的历史记录与接口不一致，"
+                    "已停止写入，防止静默覆盖"
+                )
 
     new_rows = latest[
         ~latest["draw_nbr"].isin(old_ids)
@@ -302,6 +349,8 @@ def merge_history(history, latest):
         "draw_nbr",
         ascending=True,
     ).reset_index(drop=True)
+
+    logging.info("本次识别到新增期数：%s", len(new_rows))
 
     return merged, new_rows
 
@@ -343,18 +392,61 @@ def main():
     started_at = datetime.now(timezone.utc).isoformat()
 
     history = load_history()
-
-    logging.info("现有历史记录：%s 期", len(history))
-
     latest, rejected = fetch_latest()
+
+    history_max = (
+        int(history["draw_nbr"].max())
+        if not history.empty
+        else None
+    )
+
+    api_max = int(latest["draw_nbr"].max())
+    api_min = int(latest["draw_nbr"].min())
+
+    logging.info("CSV更新前最大期号：%s", history_max)
+    logging.info("接口最大期号：%s", api_max)
+
+    if history_max is not None:
+        if api_max <= history_max:
+            logging.warning(
+                "接口没有提供比CSV更新的期号："
+                "CSV=%s，接口=%s",
+                history_max,
+                api_max,
+            )
+        elif api_max > history_max + 1:
+            logging.warning(
+                "检测到期号跨度：CSV=%s，接口=%s，"
+                "请核对中间期号是否都存在",
+                history_max,
+                api_max,
+            )
 
     merged, new_rows = merge_history(
         history,
         latest,
     )
 
-    # 仅在所有校验通过后写入正式历史库。
+    # 仅在校验和合并成功后写入正式文件。
     atomic_save_csv(merged, HISTORY_FILE)
+
+    merged_max = (
+        int(merged["draw_nbr"].max())
+        if not merged.empty
+        else None
+    )
+
+    missing_periods = []
+
+    if history_max is not None and api_max > history_max + 1:
+        present = set(
+            latest["draw_nbr"].astype(int).tolist()
+        )
+        missing_periods = [
+            period
+            for period in range(history_max + 1, api_max)
+            if period not in present
+        ]
 
     report = {
         "project": "PC28-DeepFusion-AI",
@@ -363,35 +455,50 @@ def main():
         "api_url": API_URL,
         "history_before": int(len(history)),
         "api_records_validated": int(len(latest)),
+        "api_min_period": api_min,
+        "api_max_period": api_max,
+        "history_max_before": history_max,
         "new_records": int(len(new_rows)),
         "history_after": int(len(merged)),
+        "history_max_after": merged_max,
+        "missing_periods_between_old_and_api": missing_periods,
+        "rejected_count": len(rejected),
         "rejected_records": rejected,
-        "latest_period": (
-            int(merged["draw_nbr"].max())
-            if len(merged)
-            else None
-        ),
-        "earliest_period": (
-            int(merged["draw_nbr"].min())
-            if len(merged)
+        "api_ahead_of_history": (
+            api_max > history_max
+            if history_max is not None
             else None
         ),
     }
 
+    if history_max is not None and api_max <= history_max:
+        report["status"] = "no_new_periods_from_api"
+
     write_report(report)
 
-    logging.info(
-        "更新完成：新增 %s 期，总计 %s 期",
-        len(new_rows),
-        len(merged),
-    )
+    logging.info("更新后CSV记录数：%s", len(merged))
+    logging.info("更新后CSV最大期号：%s", merged_max)
+    logging.info("接口最大期号：%s", api_max)
+    logging.info("本次新增期数：%s", len(new_rows))
 
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    if missing_periods:
+        logging.warning(
+            "接口返回范围内发现缺失期号：%s",
+            missing_periods[:30],
+        )
+
+    print(
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:
+    except Exception:
         logging.exception("数据更新失败")
-        raise SystemExit(1) from exc
+        raise SystemExit(1)
