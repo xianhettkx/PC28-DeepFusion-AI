@@ -1,10 +1,10 @@
 {
   "project": "PC28-DeepFusion-AI",
-  "generated_at": "2026-10-29T19:12:48.942291+00:00",
+  "generated_at": "2026-10-29T23:17:23.024966+00:00",
   "data": {
-    "rows": 31645,
+    "rows": 31715,
     "first_period": 3468474,
-    "last_period": 3500142,
+    "last_period": 3500212,
     "period_gaps": 3,
     "validation": "passed"
   },
@@ -22,91 +22,91 @@
     "final_test_used_for_weight_tuning": false
   },
   "independent_test": {
-    "train_samples": 25292,
-    "test_samples": 6323,
+    "train_samples": 25348,
+    "test_samples": 6337,
     "models": {
       "logistic_regression": {
-        "samples": 6323,
-        "accuracy": 0.269967,
-        "log_loss": 1.38486,
-        "majority_baseline_accuracy": 0.272972
+        "samples": 6337,
+        "accuracy": 0.270791,
+        "log_loss": 1.385138,
+        "majority_baseline_accuracy": 0.272053
       },
       "random_forest": {
-        "samples": 6323,
-        "accuracy": 0.265697,
-        "log_loss": 1.385672,
-        "majority_baseline_accuracy": 0.272972
+        "samples": 6337,
+        "accuracy": 0.26511,
+        "log_loss": 1.385222,
+        "majority_baseline_accuracy": 0.272053
       },
       "extra_trees": {
-        "samples": 6323,
-        "accuracy": 0.268385,
-        "log_loss": 1.384618,
-        "majority_baseline_accuracy": 0.272972
+        "samples": 6337,
+        "accuracy": 0.26511,
+        "log_loss": 1.385037,
+        "majority_baseline_accuracy": 0.272053
       }
     },
     "equal_weight_ensemble": {
-      "samples": 6323,
-      "accuracy": 0.267594,
-      "log_loss": 1.384211,
-      "majority_baseline_accuracy": 0.272972
+      "samples": 6337,
+      "accuracy": 0.269528,
+      "log_loss": 1.384298,
+      "majority_baseline_accuracy": 0.272053
     },
     "historical_frequency_baseline": {
-      "samples": 6323,
-      "accuracy": 0.264906,
-      "log_loss": 1.383422,
-      "majority_baseline_accuracy": 0.272972
+      "samples": 6337,
+      "accuracy": 0.265425,
+      "log_loss": 1.383468,
+      "majority_baseline_accuracy": 0.272053
     }
   },
   "rolling_backtest": [
     {
-      "samples": 3161,
-      "accuracy": 0.287884,
-      "log_loss": 1.386839,
-      "majority_baseline_accuracy": 0.270168,
+      "samples": 3168,
+      "accuracy": 0.275253,
+      "log_loss": 1.386408,
+      "majority_baseline_accuracy": 0.271149,
       "fold": 1,
-      "train_samples": 18969
+      "train_samples": 19011
     },
     {
-      "samples": 3162,
-      "accuracy": 0.275775,
-      "log_loss": 1.383206,
-      "majority_baseline_accuracy": 0.276091,
+      "samples": 3169,
+      "accuracy": 0.261912,
+      "log_loss": 1.383604,
+      "majority_baseline_accuracy": 0.276428,
       "fold": 2,
-      "train_samples": 22130
+      "train_samples": 22179
     },
     {
-      "samples": 3161,
-      "accuracy": 0.272699,
-      "log_loss": 1.385368,
-      "majority_baseline_accuracy": 0.2708,
+      "samples": 3168,
+      "accuracy": 0.274306,
+      "log_loss": 1.384894,
+      "majority_baseline_accuracy": 0.27178,
       "fold": 3,
-      "train_samples": 25292
+      "train_samples": 25348
     },
     {
-      "samples": 3162,
-      "accuracy": 0.260595,
-      "log_loss": 1.382911,
-      "majority_baseline_accuracy": 0.275142,
+      "samples": 3169,
+      "accuracy": 0.261912,
+      "log_loss": 1.383499,
+      "majority_baseline_accuracy": 0.272326,
       "fold": 4,
-      "train_samples": 28453
+      "train_samples": 28516
     }
   ],
   "next_draw_estimate": {
-    "period_reference": 3500143,
+    "period_reference": 3500213,
     "probabilities": {
-      "大单": 0.223134,
-      "小单": 0.256332,
-      "大双": 0.277071,
-      "小双": 0.243463
+      "大单": 0.231447,
+      "小单": 0.273652,
+      "大双": 0.26495,
+      "小双": 0.229951
     },
     "top_two_groups": [
       {
-        "group": "大双",
-        "probability": 0.277071
+        "group": "小单",
+        "probability": 0.273652
       },
       {
-        "group": "小单",
-        "probability": 0.256332
+        "group": "大双",
+        "probability": 0.26495
       }
     ],
     "warning": "研究性模型估计，不保证预测准确。若开奖近似独立随机，历史数据可能没有稳定预测力。"
